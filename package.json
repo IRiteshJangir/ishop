@@ -1,0 +1,29 @@
+{
+  "name": "ishop-fullstack-ecommerce",
+  "version": "1.0.0",
+  "description": "Full-Stack E-Commerce Web Application (SWOO TECH MART & Admin Portal) built with Next.js, React, Tailwind CSS, Node.js, Express, and MongoDB",
+  "scripts": {
+    "dev:backend": "cd backend && npm run dev",
+    "dev:frontend": "cd frontend && npm run dev",
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "build:frontend": "cd frontend && npm run build",
+    "start:backend": "cd backend && npm start",
+    "start:frontend": "cd frontend && npm start",
+    "seed": "cd backend && npm run seed"
+  },
+  "keywords": [
+    "ecommerce",
+    "nextjs",
+    "react",
+    "tailwindcss",
+    "nodejs",
+    "express",
+    "mongodb",
+    "mongoose"
+  ],
+  "author": "Antigravity Engineering",
+  "license": "ISC",
+  "devDependencies": {
+    "concurrently": "^10.0.6"
+  }
+}
