@@ -1,10 +1,11 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import Header from '@/components/header/Header';
 import Footer from '@/components/footer/Footer';
 import { initialProducts } from '@/lib/mockData';
+import { apiFetch } from '@/lib/api';
 import { useCart } from '@/context/CartContext';
 import { useWishlist } from '@/context/WishlistContext';
 import { 
@@ -23,6 +24,28 @@ export default function HomePage() {
   const [activeBestSellerTab, setActiveBestSellerTab] = useState('TOP 20');
   const [heroNewsletter, setHeroNewsletter] = useState('');
   const [subscribedNotice, setSubscribedNotice] = useState(false);
+
+  // Live products & categories fetched from MongoDB
+  const [liveProducts, setLiveProducts] = useState(initialProducts);
+  const [liveCategories, setLiveCategories] = useState([]);
+
+  useEffect(() => {
+    apiFetch('/api/products')
+      .then(res => {
+        if (res.products && res.products.length > 0) {
+          setLiveProducts(res.products);
+        }
+      })
+      .catch(() => {});
+
+    apiFetch('/api/categories')
+      .then(res => {
+        if (res.categories && res.categories.length > 0) {
+          setLiveCategories(res.categories);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   // Check on the Day thumbnail selector
   const dealThumbnails = [
@@ -94,226 +117,87 @@ export default function HomePage() {
     { name: 'Monitors', count: '9 Items', img: 'https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?w=200&auto=format&fit=crop&q=80', slug: 'desktop' },
   ];
 
-  // Best sellers items matching mockup
-  const bestSellers = [
-    {
-      _id: 'bs_1',
-      name: 'Sony WH-1000XM5 Wireless Noise Canceling Headphones',
-      slug: 'sony-wh-1000xm5-wireless-noise-canceling-headphones',
-      price: 299.00,
-      originalPrice: 399.00,
-      badge: 'SAVE $100.00',
-      badgeType: 'save',
-      rating: 5.0,
-      reviews: 142,
-      image: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=400&auto=format&fit=crop&q=80',
-      shipping: 'FREE SHIPPING',
-      stock: 'In stock',
-      colors: ['#ffffff', '#1f2937'],
-    },
-    {
-      _id: 'bs_2',
-      name: 'Apple iPad Air 10.9-inch (5th Generation) Wi-Fi 64GB',
-      slug: 'apod-pro-tablet-2023-lte-wifi-gps-cellular-12-9-inch-512gb',
-      price: 599.00,
-      originalPrice: 699.00,
-      badge: 'TOP SELLING',
-      badgeType: 'top',
-      rating: 5.0,
-      reviews: 89,
-      image: 'https://images.unsplash.com/photo-1544244015-0df4b3ffc6b0?w=400&auto=format&fit=crop&q=80',
-      shipping: 'FREE SHIPPING',
-      stock: 'In stock',
-      colors: ['#475569', '#3b82f6', '#ec4899'],
-    },
-    {
-      _id: 'bs_3',
-      name: 'Samsung Galaxy Book3 Pro 360 2-in-1 Laptop',
-      slug: 'pinneaple-macbook-pro-2022-m1-512gb',
-      price: 1746.50,
-      originalPrice: 1999.00,
-      badge: 'NEW',
-      badgeType: 'new',
-      rating: 4.9,
-      reviews: 58,
-      image: 'https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=400&auto=format&fit=crop&q=80',
-      shipping: 'FREE SHIPPING',
-      stock: 'In stock',
-      colors: ['#1f2937', '#e2e8f0'],
-    },
-    {
-      _id: 'bs_4',
-      name: 'Apple Watch Series 8 GPS + Cellular Stainless Steel Case',
-      slug: 'apple-watch-series-8-gps-cellular',
-      price: 479.00,
-      originalPrice: 529.00,
-      badge: 'TOP SELLING',
-      badgeType: 'top',
-      rating: 5.0,
-      reviews: 312,
-      image: 'https://images.unsplash.com/photo-1508685096489-7aacd43bd3b1?w=400&auto=format&fit=crop&q=80',
-      shipping: 'FREE SHIPPING',
-      stock: 'In stock',
-      colors: ['#1f2937', '#eab308', '#e2e8f0'],
-    },
-    {
-      _id: 'bs_5',
-      name: 'Anker 65W GaN Fast Dual USB-C Wall Charger',
-      slug: 'anker-65w-gan-fast-charger',
-      price: 49.00,
-      originalPrice: 65.00,
-      badge: 'HOT',
-      badgeType: 'hot',
-      rating: 4.8,
-      reviews: 76,
-      image: 'https://images.unsplash.com/photo-1583863788434-e58a36330cf0?w=400&auto=format&fit=crop&q=80',
-      shipping: 'FREE SHIPPING',
-      stock: 'In stock',
-      colors: ['#ffffff', '#1f2937'],
-    },
-  ];
+  // Dynamic product formatting helper for homepage shelves
+  const formatItem = (p) => ({
+    _id: p._id,
+    name: p.name,
+    slug: p.slug,
+    price: Number(p.finalPrice !== undefined ? p.finalPrice : p.originalPrice || 0),
+    originalPrice: Number(p.originalPrice || p.finalPrice || 0),
+    badge: p.isTopSelling ? 'TOP SELLING' : p.discount > 0 ? `SAVE ${p.discount}%` : 'NEW',
+    badgeType: p.isTopSelling ? 'top' : p.discount > 0 ? 'save' : 'new',
+    rating: p.rating || 5.0,
+    reviews: p.numReviews || 88,
+    image: p.thumbnail || 'https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?w=400&auto=format&fit=crop&q=80',
+    shipping: 'FREE SHIPPING',
+    stock: (p.countInStock !== undefined ? p.countInStock > 0 : true) ? 'In stock' : 'Out of stock',
+    colors: p.colorHexes && p.colorHexes.length ? p.colorHexes : ['#ffffff', '#1f2937'],
+  });
 
-  // Phones & Tablets items matching mockup
-  const phonesTablets = [
-    {
-      _id: 'pt_1',
-      name: 'SROK Smart Phone 128GB, Oled Retina',
-      slug: 'srok-smart-phone-128gb-oled-retina',
-      price: 579.00,
-      originalPrice: 739.00,
-      badge: 'SAVE $160.00',
-      image: 'https://images.unsplash.com/photo-1565849904461-04a58ad377e0?w=400&auto=format&fit=crop&q=80',
-      rating: 5.0,
-      reviews: 152,
-      shipping: 'FREE SHIPPING',
-      stock: 'In stock',
-    },
-    {
-      _id: 'pt_2',
-      name: 'aPod Pro Tablet 2023 LTE + Wifi, GPS Cellular 12.9 Inch',
-      slug: 'apod-pro-tablet-2023-lte-wifi-gps-cellular-12-9-inch-512gb',
-      price: 979.00,
-      originalPrice: 1199.00,
-      badge: 'NEW',
-      image: 'https://images.unsplash.com/photo-1544244015-0df4b3ffc6b0?w=400&auto=format&fit=crop&q=80',
-      rating: 5.0,
-      reviews: 88,
-      shipping: '$2.00 SHIPPING',
-      stock: 'In stock',
-    },
-    {
-      _id: 'pt_3',
-      name: 'Samsung Galaxy X6 Ultra LTE 4G/128 Gb, Black Smartphone',
-      slug: 'samsung-galaxy-x6-ultra-lte-4g-128-gb-black-smartphone',
-      price: 659.00,
-      originalPrice: 799.00,
-      badge: 'NEW',
-      image: 'https://images.unsplash.com/photo-1574944985070-8f3ebc6b79d2?w=400&auto=format&fit=crop&q=80',
-      rating: 4.8,
-      reviews: 5,
-      shipping: 'FREE SHIPPING',
-      freeGift: true,
-      stock: 'In stock',
-      colors: ['#1f2937', '#3b82f6'],
-    },
-    {
-      _id: 'pt_4',
-      name: 'Xiaomi Redmi Note 12 Pro 5G 256GB Dual SIM',
-      slug: 'vivo-x200',
-      price: 359.00,
-      originalPrice: 429.00,
-      badge: 'HOT',
-      image: 'https://images.unsplash.com/photo-1598327105666-5b89351aff97?w=400&auto=format&fit=crop&q=80',
-      rating: 4.7,
-      reviews: 43,
-      shipping: 'FREE SHIPPING',
-      stock: 'In stock',
-    },
-    {
-      _id: 'pt_5',
-      name: 'Apple iPad 10.2-inch Wi-Fi 64GB - Space Gray',
-      slug: 'apple-ipad-10-inch-space-gray',
-      price: 329.00,
-      originalPrice: 379.00,
-      badge: 'NEW',
-      image: 'https://images.unsplash.com/photo-1561154464-82e9adf32764?w=400&auto=format&fit=crop&q=80',
-      rating: 5.0,
-      reviews: 91,
-      shipping: 'FREE SHIPPING',
-      stock: 'In stock',
-      colors: ['#475569', '#e2e8f0'],
-    },
-  ];
+  // Best sellers items dynamically computed from MongoDB live products
+  const bestSellers = useMemo(() => {
+    if (!liveProducts.length) return [];
+    const filtered = liveProducts.filter(p => {
+      if (activeBestSellerTab === 'BABY & KIDS') {
+        return p.categoryName?.toLowerCase().includes('kids') || p.categoryName?.toLowerCase().includes('game') || p.categoryName?.toLowerCase().includes('vr');
+      }
+      if (activeBestSellerTab === 'ELECTRONIC') {
+        return p.categoryName?.toLowerCase().includes('electronic') || p.categoryName?.toLowerCase().includes('phone') || p.categoryName?.toLowerCase().includes('laptop') || p.categoryName?.toLowerCase().includes('desktop');
+      }
+      return true; // TOP 20
+    });
+    return (filtered.length ? filtered : liveProducts).slice(0, 8).map(formatItem);
+  }, [liveProducts, activeBestSellerTab]);
 
-  // Laptops & Computers items matching mockup
-  const laptopsComputers = [
-    {
-      _id: 'lc_1',
-      name: 'MacBook Air 13.6" Laptop - Apple M2 chip - 256GB SSD',
-      slug: 'pinneaple-macbook-pro-2022-m1-512gb',
-      price: 1099.00,
-      originalPrice: 1199.00,
-      badge: 'NEW',
-      image: 'https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=400&auto=format&fit=crop&q=80',
-      rating: 5.0,
-      reviews: 180,
-      shipping: 'FREE SHIPPING',
-      stock: 'In stock',
-    },
-    {
-      _id: 'lc_2',
-      name: 'Marshall Stanmore II Wireless Bluetooth Speaker',
-      slug: 'marshall-stanmore-ii-wireless-speaker',
-      price: 349.00,
-      originalPrice: 399.00,
-      badge: 'NEW',
-      image: 'https://images.unsplash.com/photo-1545454675-3531b543be5d?w=400&auto=format&fit=crop&q=80',
-      rating: 4.9,
-      reviews: 64,
-      shipping: 'FREE SHIPPING',
-      stock: 'In stock',
-      colors: ['#1f2937', '#e5e7eb'],
-    },
-    {
-      _id: 'lc_3',
-      name: 'CyberPowerPC Gamer Master Gaming Desktop - AMD Ryzen 5',
-      slug: 'cyberpower-gamer-master-desktop',
-      price: 1149.00,
-      originalPrice: 1299.00,
-      badge: 'HOT',
-      image: 'https://images.unsplash.com/photo-1587831990711-23ca6441447b?w=400&auto=format&fit=crop&q=80',
-      rating: 4.8,
-      reviews: 52,
-      shipping: 'FREE SHIPPING',
-      stock: 'In stock',
-    },
-    {
-      _id: 'lc_4',
-      name: 'iBUYPOWER TraceMR Gaming PC Tower - Intel Core i7',
-      slug: 'ibuypower-tracemr-gaming-pc',
-      price: 1399.00,
-      originalPrice: 1549.00,
-      badge: 'HOT',
-      image: 'https://images.unsplash.com/photo-1593640408182-31c70c8268f5?w=400&auto=format&fit=crop&q=80',
-      rating: 4.9,
-      reviews: 38,
-      shipping: 'FREE SHIPPING',
-      stock: 'In stock',
-    },
-    {
-      _id: 'lc_5',
-      name: 'Apple 24" iMac with Retina 4.5K display - M1 Chip - Silver',
-      slug: 'apple-24-imac-retina-4k-silver',
-      price: 1299.00,
-      originalPrice: 1499.00,
-      badge: 'NEW',
-      image: 'https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?w=400&auto=format&fit=crop&q=80',
-      rating: 5.0,
-      reviews: 112,
-      shipping: 'FREE SHIPPING',
-      stock: 'In stock',
-    },
-  ];
+  // Phones & Tablets items dynamically computed from MongoDB live products
+  const phonesTablets = useMemo(() => {
+    const list = liveProducts.filter(p => 
+      p.categoryName?.toLowerCase().includes('phone') || 
+      p.categoryName?.toLowerCase().includes('tablet') || 
+      p.slug?.includes('phone') || 
+      p.slug?.includes('iphone') || 
+      p.slug?.includes('samsung') || 
+      p.slug?.includes('tablet') ||
+      p.slug?.includes('vivo') ||
+      p.slug?.includes('plus')
+    );
+    return (list.length ? list : liveProducts).slice(0, 6).map(formatItem);
+  }, [liveProducts]);
+
+  // Laptops & Computers items dynamically computed from MongoDB live products
+  const laptopsComputers = useMemo(() => {
+    const list = liveProducts.filter(p => 
+      p.categoryName?.toLowerCase().includes('laptop') || 
+      p.categoryName?.toLowerCase().includes('desktop') || 
+      p.categoryName?.toLowerCase().includes('computer') || 
+      p.slug?.includes('macbook') || 
+      p.slug?.includes('laptop') || 
+      p.slug?.includes('book') ||
+      p.slug?.includes('pc')
+    );
+    return (list.length ? list : liveProducts).slice(0, 6).map(formatItem);
+  }, [liveProducts]);
+
+  // Dynamic Category Sidebar populated from MongoDB
+  const sidebarCategories = useMemo(() => {
+    if (liveCategories.length > 0) {
+      return liveCategories.map(c => ({
+        name: c.name,
+        count: 'Live',
+        icon: c.slug?.includes('phone') ? Smartphone : c.slug?.includes('headphone') ? Headphones : c.slug?.includes('game') ? Gamepad2 : Laptop,
+        href: `/shop?category=${encodeURIComponent(c.name)}`,
+      }));
+    }
+    return [
+      { name: 'Laptops', count: '12', icon: Laptop, href: '/shop?category=Laptops' },
+      { name: 'Technologies & IT', count: '45', icon: Monitor, href: '/shop?category=Desktop' },
+      { name: 'Smart Phones', count: '28', icon: Smartphone, href: '/shop?category=Mobile phone' },
+      { name: 'VR / Games', count: '16', icon: Gamepad2, href: '/shop?category=Gaming & VR' },
+      { name: 'Accessories', count: '54', icon: Headphones, href: '/shop?category=Headphone' },
+      { name: 'Cameras', count: '19', icon: Camera, href: '/shop' },
+      { name: 'Office Equipments', count: '31', icon: Printer, href: '/shop' },
+    ];
+  }, [liveCategories]);
 
   return (
     <div className="min-h-screen flex flex-col bg-[#f8fafc]">
@@ -335,16 +219,8 @@ export default function HomePage() {
               </div>
 
               <ul className="space-y-1 text-xs font-semibold text-slate-700">
-                {[
-                  { name: 'Laptops', count: '12', icon: Laptop, href: '/shop?category=laptops' },
-                  { name: 'Technologies & IT', count: '45', icon: Monitor, href: '/shop?category=desktop' },
-                  { name: 'Smart Phones', count: '28', icon: Smartphone, href: '/shop?category=mobile-phone' },
-                  { name: 'VR / Games', count: '16', icon: Gamepad2, href: '/shop?category=gaming-vr' },
-                  { name: 'Accessories', count: '54', icon: Headphones, href: '/shop?category=headphone' },
-                  { name: 'Cameras', count: '19', icon: Camera, href: '/shop' },
-                  { name: 'Office Equipments', count: '31', icon: Printer, href: '/shop' },
-                ].map((cat, idx) => {
-                  const Icon = cat.icon;
+                {sidebarCategories.map((cat, idx) => {
+                  const Icon = cat.icon || Laptop;
                   return (
                     <li key={idx}>
                       <Link

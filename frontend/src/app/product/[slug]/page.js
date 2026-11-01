@@ -1,11 +1,12 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import Header from '@/components/header/Header';
 import Footer from '@/components/footer/Footer';
 import { initialProducts } from '@/lib/mockData';
+import { apiFetch } from '@/lib/api';
 import { useCart } from '@/context/CartContext';
 import { useWishlist } from '@/context/WishlistContext';
 import { 
@@ -20,18 +21,42 @@ export default function ProductDetailPage() {
   const { addToCart } = useCart();
   const { toggleWishlist, isInWishlist } = useWishlist();
 
-  // Find product by slug or default to first
-  const product = useMemo(() => {
+  // Dynamic product loaded from live backend MongoDB API
+  const [product, setProduct] = useState(() => {
     return initialProducts.find(p => p.slug === slug) || initialProducts[0];
-  }, [slug]);
+  });
 
-  const [selectedImage, setSelectedImage] = useState(product.thumbnail);
-  const [selectedColor, setSelectedColor] = useState(product.colorNames?.[0] || 'Space Gray');
-  const [selectedMemory, setSelectedMemory] = useState(product.memorySizes?.[0] || '128GB');
+  const [selectedImage, setSelectedImage] = useState(product?.thumbnail);
+  const [selectedColor, setSelectedColor] = useState(product?.colorNames?.[0] || 'Space Gray');
+  const [selectedMemory, setSelectedMemory] = useState(product?.memorySizes?.[0] || '128GB');
   const [quantity, setQuantity] = useState(1);
   const [activeTab, setActiveTab] = useState('description');
   const [bundleChecked, setBundleChecked] = useState([true, true, true]);
   const [addedNotice, setAddedNotice] = useState(false);
+  const [liveRelated, setLiveRelated] = useState([]);
+
+  useEffect(() => {
+    if (slug) {
+      apiFetch(`/api/products/${slug}`)
+        .then(res => {
+          if (res.product) {
+            setProduct(res.product);
+            if (res.product.thumbnail) setSelectedImage(res.product.thumbnail);
+            if (res.product.colorNames?.[0]) setSelectedColor(res.product.colorNames[0]);
+            if (res.product.memorySizes?.[0]) setSelectedMemory(res.product.memorySizes[0]);
+          }
+        })
+        .catch(() => {});
+    }
+
+    apiFetch('/api/products')
+      .then(res => {
+        if (res.products && res.products.length > 0) {
+          setLiveRelated(res.products.filter(p => p.slug !== slug).slice(0, 4));
+        }
+      })
+      .catch(() => {});
+  }, [slug]);
 
   // Bundle items
   const bundleItems = [
@@ -56,7 +81,7 @@ export default function ProductDetailPage() {
     setTimeout(() => setAddedNotice(false), 2500);
   };
 
-  const relatedProducts = initialProducts.filter(p => p._id !== product._id).slice(0, 4);
+  const relatedProducts = liveRelated.length ? liveRelated : initialProducts.filter(p => p._id !== product?._id).slice(0, 4);
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-50">

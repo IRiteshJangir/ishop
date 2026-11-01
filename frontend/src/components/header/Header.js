@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { apiFetch } from '@/lib/api';
 import { useAuth } from '@/context/AuthContext';
 import { useCart } from '@/context/CartContext';
 import { useWishlist } from '@/context/WishlistContext';
@@ -19,16 +20,27 @@ export default function Header() {
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All Categories');
+  const [categories, setCategories] = useState([]);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
 
+  useEffect(() => {
+    apiFetch('/api/categories')
+      .then(res => {
+        if (res.categories && res.categories.length > 0) {
+          setCategories(res.categories);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
   const handleSearch = (e) => {
     e.preventDefault();
-    if (searchQuery.trim()) {
-      router.push(`/shop?keyword=${encodeURIComponent(searchQuery.trim())}`);
-    } else {
-      router.push('/shop');
-    }
+    const params = new URLSearchParams();
+    if (searchQuery.trim()) params.set('keyword', searchQuery.trim());
+    if (selectedCategory && selectedCategory !== 'All Categories') params.set('category', selectedCategory);
+    const qs = params.toString();
+    router.push(qs ? `/shop?${qs}` : '/shop');
   };
 
   return (
@@ -192,16 +204,24 @@ export default function Header() {
               <select 
                 value={selectedCategory}
                 onChange={(e) => setSelectedCategory(e.target.value)}
-                className="bg-transparent pr-4 outline-none appearance-none cursor-pointer text-gray-700"
+                className="bg-transparent pr-4 outline-none appearance-none cursor-pointer text-gray-700 max-w-[130px] truncate"
               >
-                <option>All Categories</option>
-                <option>Mobile phone</option>
-                <option>Desktop</option>
-                <option>Headphone</option>
-                <option>Mouse</option>
-                <option>Laptops</option>
-                <option>Tablets</option>
-                <option>Gaming & VR</option>
+                <option value="All Categories">All Categories</option>
+                {categories.length > 0 ? (
+                  categories.map(c => (
+                    <option key={c._id || c.slug} value={c.name}>{c.name}</option>
+                  ))
+                ) : (
+                  <>
+                    <option value="Mobile phone">Mobile phone</option>
+                    <option value="Desktop">Desktop</option>
+                    <option value="Headphone">Headphone</option>
+                    <option value="Mouse">Mouse</option>
+                    <option value="Laptops">Laptops</option>
+                    <option value="Tablets">Tablets</option>
+                    <option value="Gaming & VR">Gaming &amp; VR</option>
+                  </>
+                )}
               </select>
               <ChevronDown className="w-3 h-3 text-gray-400 pointer-events-none absolute right-1" />
             </div>
