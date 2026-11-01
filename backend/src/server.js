@@ -73,6 +73,8 @@ app.get('/api/health', (req, res) => {
 // API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/products', productRoutes);
+app.use('/product', productRoutes); // Alias for /product and /product/create
+app.use('/products', productRoutes); // Alias for /products
 app.use('/api/categories', categoryRoutes);
 app.use('/api/brands', brandRoutes);
 app.use('/api/colors', colorRoutes);
@@ -83,11 +85,24 @@ app.use('/api/upload', uploadRoutes);
 app.use(notFound);
 app.use(errorHandler);
 
-const PORT = process.env.PORT || 5000;
+const PORT = Number(process.env.PORT) || 5000;
+const ALT_PORT = 5001;
 
-app.listen(PORT, () => {
-  console.log(`🚀 [Server Running]: Backend server active on port ${PORT}`);
+const server = app.listen(PORT, () => {
+  console.log(`🚀 [Server Running]: Backend server active on primary port ${PORT}`);
   console.log(`🌐 [API Endpoints]: http://localhost:${PORT}/api/products`);
 });
+
+if (PORT !== ALT_PORT) {
+  const altServer = app.listen(ALT_PORT, () => {
+    console.log(`🚀 [Dual-Port Support]: Also listening on port ${ALT_PORT} (http://localhost:${ALT_PORT}/product/create)`);
+  });
+  altServer.on('error', (err) => {
+    // Gracefully ignore if port 5001 is already taken by another process
+    if (err.code !== 'EADDRINUSE') {
+      console.warn(`[Port ${ALT_PORT} Notice]:`, err.message);
+    }
+  });
+}
 
 module.exports = app;
