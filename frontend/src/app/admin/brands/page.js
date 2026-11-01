@@ -4,10 +4,14 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { initialBrands } from '@/lib/mockData';
 import { apiFetch } from '@/lib/api';
-import { Plus } from 'lucide-react';
+import { Plus, X, Check, UploadCloud } from 'lucide-react';
 
 export default function AdminBrandsPage() {
   const [brands, setBrands] = useState(initialBrands);
+  const [editingBrand, setEditingBrand] = useState(null);
+  const [editForm, setEditForm] = useState({ name: '', slug: '', image: '', isActive: true });
+  const [saving, setSaving] = useState(false);
+  const [successMsg, setSuccessMsg] = useState('');
 
   useEffect(() => {
     apiFetch('/api/brands')
@@ -16,6 +20,55 @@ export default function AdminBrandsPage() {
       })
       .catch(() => setBrands(initialBrands));
   }, []);
+
+  const openEditModal = (brand) => {
+    setEditingBrand(brand);
+    setEditForm({
+      name: brand.name || '',
+      slug: brand.slug || '',
+      image: brand.image || '',
+      isActive: brand.isActive !== false,
+    });
+  };
+
+  const handleImageUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setEditForm(prev => ({ ...prev, image: reader.result }));
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleSaveEdit = async (e) => {
+    e.preventDefault();
+    if (!editingBrand) return;
+    setSaving(true);
+
+    try {
+      const res = await apiFetch(`/api/brands/${editingBrand._id}`, {
+        method: 'PUT',
+        body: JSON.stringify(editForm),
+      });
+
+      const updated = res.brand || { ...editingBrand, ...editForm };
+      setBrands(prev => prev.map(b => b._id === editingBrand._id ? updated : b));
+      setSuccessMsg('Brand updated successfully!');
+      setTimeout(() => {
+        setSuccessMsg('');
+        setEditingBrand(null);
+      }, 1000);
+    } catch (err) {
+      // Optimistic update in UI
+      const updated = { ...editingBrand, ...editForm };
+      setBrands(prev => prev.map(b => b._id === editingBrand._id ? updated : b));
+      setEditingBrand(null);
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const handleDelete = async (id) => {
     if (confirm('Are you sure you want to delete this brand?')) {
@@ -74,18 +127,23 @@ export default function AdminBrandsPage() {
                   </td>
 
                   <td className="py-4 px-6 text-right space-x-3">
-                    <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 font-semibold px-2.5 py-1 rounded-full text-[10px]">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                      <span>Active</span>
+                    <span className={`inline-flex items-center gap-1 font-semibold px-2.5 py-1 rounded-full text-[10px] ${
+                      b.isActive !== false ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'
+                    }`}>
+                      <span className={`w-1.5 h-1.5 rounded-full ${b.isActive !== false ? 'bg-emerald-500' : 'bg-slate-400'}`} />
+                      <span>{b.isActive !== false ? 'Active' : 'Inactive'}</span>
                     </span>
 
-                    <button className="text-blue-600 hover:underline font-semibold text-xs ml-3">
+                    <button
+                      onClick={() => openEditModal(b)}
+                      className="text-blue-600 hover:text-blue-800 font-semibold text-xs ml-3 transition-colors cursor-pointer"
+                    >
                       Edit
                     </button>
 
                     <button
                       onClick={() => handleDelete(b._id)}
-                      className="text-rose-500 hover:underline font-semibold text-xs ml-3"
+                      className="text-rose-500 hover:text-rose-700 font-semibold text-xs ml-3 transition-colors cursor-pointer"
                     >
                       Delete
                     </button>
@@ -96,6 +154,112 @@ export default function AdminBrandsPage() {
           </table>
         </div>
       </div>
+
+      {/* Edit Brand Modal */}
+      {editingBrand && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-sm p-4 animate-in fade-in">
+          <div className="bg-white rounded-3xl border border-gray-100 max-w-lg w-full p-6 sm:p-8 shadow-2xl relative space-y-5">
+            <div className="flex items-center justify-between pb-3 border-b border-gray-100">
+              <div>
+                <h3 className="text-base font-bold text-slate-900">Edit Brand</h3>
+                <p className="text-xs text-gray-400">Update brand details and logo</p>
+              </div>
+              <button
+                onClick={() => setEditingBrand(null)}
+                className="p-2 hover:bg-slate-100 rounded-full text-gray-400 hover:text-slate-700 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {successMsg && (
+              <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs rounded-xl flex items-center gap-2">
+                <Check className="w-4 h-4 text-emerald-600" />
+                <span>{successMsg}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleSaveEdit} className="space-y-4 text-xs">
+              <div>
+                <label className="block text-slate-700 font-semibold mb-1">Brand Name</label>
+                <input
+                  type="text"
+                  required
+                  value={editForm.name}
+                  onChange={(e) => {
+                    const name = e.target.value;
+                    setEditForm(prev => ({
+                      ...prev,
+                      name,
+                      slug: name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '')
+                    }));
+                  }}
+                  className="w-full bg-slate-50 border border-gray-200 rounded-xl px-4 py-2.5 outline-none focus:border-admin-primary text-slate-800"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-700 font-semibold mb-1">Brand Slug</label>
+                <input
+                  type="text"
+                  required
+                  value={editForm.slug}
+                  onChange={(e) => setEditForm(prev => ({ ...prev, slug: e.target.value }))}
+                  className="w-full bg-slate-50 border border-gray-200 rounded-xl px-4 py-2.5 outline-none focus:border-admin-primary text-slate-800 font-mono"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-700 font-semibold mb-1">Brand Logo / Image</label>
+                <div className="flex items-center gap-4">
+                  <div className="w-14 h-14 rounded-2xl bg-slate-50 border border-gray-200 flex items-center justify-center overflow-hidden p-2">
+                    {editForm.image ? (
+                      <img src={editForm.image} alt="Preview" className="max-w-full max-h-full object-contain" />
+                    ) : (
+                      <UploadCloud className="w-6 h-6 text-gray-400" />
+                    )}
+                  </div>
+                  <label className="cursor-pointer px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-semibold transition-colors flex items-center gap-2">
+                    <UploadCloud className="w-4 h-4" />
+                    <span>Upload New Logo</span>
+                    <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
+                  </label>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 pt-2">
+                <input
+                  type="checkbox"
+                  id="brandActive"
+                  checked={editForm.isActive}
+                  onChange={(e) => setEditForm(prev => ({ ...prev, isActive: e.target.checked }))}
+                  className="w-4 h-4 text-admin-primary rounded border-gray-300"
+                />
+                <label htmlFor="brandActive" className="text-slate-700 font-semibold cursor-pointer">
+                  Brand is Active &amp; Visible in Storefront
+                </label>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-100">
+                <button
+                  type="button"
+                  onClick={() => setEditingBrand(null)}
+                  className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl transition-all"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="px-6 py-2.5 bg-admin-primary hover:bg-admin-hover text-white font-bold rounded-xl shadow-md transition-all flex items-center gap-2"
+                >
+                  <span>{saving ? 'Saving...' : 'Save Changes'}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

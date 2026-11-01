@@ -273,14 +273,16 @@ const createProduct = async (req, res) => {
 };
 
 // @desc    Update product
-// @route   PUT /api/products/:id
+// @route   PUT /api/products/:id or /api/products/:slugOrId
 // @access  Private/Admin
 const updateProduct = async (req, res) => {
   try {
-    const { id } = req.params;
+    const id = req.params.slugOrId || req.params.id;
+    const mongoose = require('mongoose');
 
     if (getDbStatus()) {
-      const product = await Product.findById(id);
+      const isObjectId = mongoose.Types.ObjectId.isValid(id);
+      const product = isObjectId ? await Product.findById(id) : await Product.findOne({ slug: id });
       if (product) {
         Object.assign(product, req.body);
         if (req.body.originalPrice && req.body.discount !== undefined && !req.body.finalPrice) {
@@ -304,14 +306,16 @@ const updateProduct = async (req, res) => {
 };
 
 // @desc    Delete product
-// @route   DELETE /api/products/:id
+// @route   DELETE /api/products/:id or /api/products/:slugOrId
 // @access  Private/Admin
 const deleteProduct = async (req, res) => {
   try {
-    const { id } = req.params;
+    const id = req.params.slugOrId || req.params.id;
+    const mongoose = require('mongoose');
 
     if (getDbStatus()) {
-      const product = await Product.findById(id);
+      const isObjectId = mongoose.Types.ObjectId.isValid(id);
+      const product = isObjectId ? await Product.findById(id) : await Product.findOne({ slug: id });
       if (product) {
         await product.deleteOne();
         return res.json({ success: true, message: 'Product removed' });
@@ -325,6 +329,10 @@ const deleteProduct = async (req, res) => {
       }
       return res.status(404).json({ success: false, message: 'Product not found' });
     }
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
   }

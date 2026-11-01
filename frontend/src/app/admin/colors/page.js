@@ -4,10 +4,14 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { initialColors } from '@/lib/mockData';
 import { apiFetch } from '@/lib/api';
-import { Plus } from 'lucide-react';
+import { Plus, X, Check, Palette } from 'lucide-react';
 
 export default function AdminColorsPage() {
   const [colors, setColors] = useState(initialColors);
+  const [editingColor, setEditingColor] = useState(null);
+  const [editForm, setEditForm] = useState({ name: '', slug: '', hex: '#000000', isActive: true });
+  const [saving, setSaving] = useState(false);
+  const [successMsg, setSuccessMsg] = useState('');
 
   useEffect(() => {
     apiFetch('/api/colors')
@@ -16,6 +20,43 @@ export default function AdminColorsPage() {
       })
       .catch(() => setColors(initialColors));
   }, []);
+
+  const openEditModal = (col) => {
+    setEditingColor(col);
+    setEditForm({
+      name: col.name || '',
+      slug: col.slug || '',
+      hex: col.hex || '#000000',
+      isActive: col.isActive !== false,
+    });
+  };
+
+  const handleSaveEdit = async (e) => {
+    e.preventDefault();
+    if (!editingColor) return;
+    setSaving(true);
+
+    try {
+      const res = await apiFetch(`/api/colors/${editingColor._id}`, {
+        method: 'PUT',
+        body: JSON.stringify(editForm),
+      });
+
+      const updated = res.color || { ...editingColor, ...editForm };
+      setColors(prev => prev.map(c => c._id === editingColor._id ? updated : c));
+      setSuccessMsg('Color updated successfully!');
+      setTimeout(() => {
+        setSuccessMsg('');
+        setEditingColor(null);
+      }, 1000);
+    } catch (err) {
+      const updated = { ...editingColor, ...editForm };
+      setColors(prev => prev.map(c => c._id === editingColor._id ? updated : c));
+      setEditingColor(null);
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const handleDelete = async (id) => {
     if (confirm('Are you sure you want to delete this color?')) {
@@ -58,10 +99,10 @@ export default function AdminColorsPage() {
                   <td className="py-4 px-6">
                     <div className="flex items-center gap-3">
                       <div
-                        style={{ backgroundColor: col.hexColor }}
-                        className="w-6 h-6 rounded-md shadow-sm border border-gray-200"
+                        className="w-7 h-7 rounded-full border border-gray-200 shadow-inner"
+                        style={{ backgroundColor: col.hex }}
                       />
-                      <span className="font-mono text-gray-400 text-xs">{col.hexColor}</span>
+                      <span className="font-mono text-xs font-bold text-slate-700">{col.hex}</span>
                     </div>
                   </td>
 
@@ -74,18 +115,23 @@ export default function AdminColorsPage() {
                   </td>
 
                   <td className="py-4 px-6 text-right space-x-3">
-                    <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 font-semibold px-2.5 py-1 rounded-full text-[10px]">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                      <span>Active</span>
+                    <span className={`inline-flex items-center gap-1 font-semibold px-2.5 py-1 rounded-full text-[10px] ${
+                      col.isActive !== false ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'
+                    }`}>
+                      <span className={`w-1.5 h-1.5 rounded-full ${col.isActive !== false ? 'bg-emerald-500' : 'bg-slate-400'}`} />
+                      <span>{col.isActive !== false ? 'Active' : 'Inactive'}</span>
                     </span>
 
-                    <button className="text-blue-600 hover:underline font-semibold text-xs ml-3">
+                    <button
+                      onClick={() => openEditModal(col)}
+                      className="text-blue-600 hover:text-blue-800 font-semibold text-xs ml-3 transition-colors cursor-pointer"
+                    >
                       Edit
                     </button>
 
                     <button
                       onClick={() => handleDelete(col._id)}
-                      className="text-rose-500 hover:underline font-semibold text-xs ml-3"
+                      className="text-rose-500 hover:text-rose-700 font-semibold text-xs ml-3 transition-colors cursor-pointer"
                     >
                       Delete
                     </button>
@@ -96,6 +142,113 @@ export default function AdminColorsPage() {
           </table>
         </div>
       </div>
+
+      {/* Edit Color Modal */}
+      {editingColor && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-sm p-4 animate-in fade-in">
+          <div className="bg-white rounded-3xl border border-gray-100 max-w-lg w-full p-6 sm:p-8 shadow-2xl relative space-y-5">
+            <div className="flex items-center justify-between pb-3 border-b border-gray-100">
+              <div>
+                <h3 className="text-base font-bold text-slate-900">Edit Color</h3>
+                <p className="text-xs text-gray-400">Update color swatch and hex code</p>
+              </div>
+              <button
+                onClick={() => setEditingColor(null)}
+                className="p-2 hover:bg-slate-100 rounded-full text-gray-400 hover:text-slate-700 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {successMsg && (
+              <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs rounded-xl flex items-center gap-2">
+                <Check className="w-4 h-4 text-emerald-600" />
+                <span>{successMsg}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleSaveEdit} className="space-y-4 text-xs">
+              <div>
+                <label className="block text-slate-700 font-semibold mb-1">Color Name</label>
+                <input
+                  type="text"
+                  required
+                  value={editForm.name}
+                  onChange={(e) => {
+                    const name = e.target.value;
+                    setEditForm(prev => ({
+                      ...prev,
+                      name,
+                      slug: name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '')
+                    }));
+                  }}
+                  className="w-full bg-slate-50 border border-gray-200 rounded-xl px-4 py-2.5 outline-none focus:border-admin-primary text-slate-800"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-700 font-semibold mb-1">Color Slug</label>
+                <input
+                  type="text"
+                  required
+                  value={editForm.slug}
+                  onChange={(e) => setEditForm(prev => ({ ...prev, slug: e.target.value }))}
+                  className="w-full bg-slate-50 border border-gray-200 rounded-xl px-4 py-2.5 outline-none focus:border-admin-primary text-slate-800 font-mono"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-700 font-semibold mb-1">Hex Color Code</label>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="color"
+                    value={editForm.hex}
+                    onChange={(e) => setEditForm(prev => ({ ...prev, hex: e.target.value }))}
+                    className="w-12 h-12 rounded-xl border border-gray-200 cursor-pointer p-0.5 bg-transparent"
+                  />
+                  <input
+                    type="text"
+                    required
+                    value={editForm.hex}
+                    onChange={(e) => setEditForm(prev => ({ ...prev, hex: e.target.value }))}
+                    className="flex-1 bg-slate-50 border border-gray-200 rounded-xl px-4 py-2.5 outline-none focus:border-admin-primary text-slate-800 font-mono font-bold"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 pt-2">
+                <input
+                  type="checkbox"
+                  id="colorActive"
+                  checked={editForm.isActive}
+                  onChange={(e) => setEditForm(prev => ({ ...prev, isActive: e.target.checked }))}
+                  className="w-4 h-4 text-admin-primary rounded border-gray-300"
+                />
+                <label htmlFor="colorActive" className="text-slate-700 font-semibold cursor-pointer">
+                  Color is Active &amp; Selectable in Storefront
+                </label>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-100">
+                <button
+                  type="button"
+                  onClick={() => setEditingColor(null)}
+                  className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl transition-all"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="px-6 py-2.5 bg-admin-primary hover:bg-admin-hover text-white font-bold rounded-xl shadow-md transition-all flex items-center gap-2"
+                >
+                  <span>{saving ? 'Saving...' : 'Save Changes'}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
