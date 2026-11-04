@@ -97,7 +97,7 @@ export default function Footer() {
               <li><Link href="/contact" className="hover:text-primary transition-colors">Customer Service</Link></li>
               <li><Link href="/about" className="hover:text-primary transition-colors">Policy</Link></li>
               <li><Link href="/about" className="hover:text-primary transition-colors">Terms & Conditions</Link></li>
-              <li><Link href="/profile" className="hover:text-primary transition-colors">Track Order</Link></li>
+              <li><Link href="/track-order" className="hover:text-primary transition-colors">Track Order</Link></li>
               <li><Link href="/about" className="hover:text-primary transition-colors">FAQs</Link></li>
               <li><Link href="/profile" className="hover:text-primary transition-colors">My Account</Link></li>
               <li><Link href="/contact" className="hover:text-primary transition-colors">Product Support</Link></li>

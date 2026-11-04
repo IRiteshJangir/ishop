@@ -55,7 +55,7 @@ export default function Header() {
 
           <div className="flex items-center gap-6">
             <Link href="/about" className="hover:text-primary transition-colors">Sell on Swoo</Link>
-            <Link href="/profile" className="hover:text-primary transition-colors">Order Tracking</Link>
+            <Link href="/track-order" className="hover:text-primary transition-colors">Order Tracking</Link>
             <div className="flex items-center gap-1 cursor-pointer hover:text-primary">
               <span>USD</span>
               <ChevronDown className="w-3 h-3" />

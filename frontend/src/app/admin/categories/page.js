@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { initialCategories } from '@/lib/mockData';
-import { apiFetch } from '@/lib/api';
+import { apiFetch, uploadImage, getImageUrl } from '@/lib/api';
 import { Plus, X, Check, Smartphone, Monitor, Headphones, Mouse, UploadCloud } from 'lucide-react';
 
 export default function AdminCategoriesPage() {
@@ -12,7 +12,9 @@ export default function AdminCategoriesPage() {
   const [editingCategory, setEditingCategory] = useState(null);
   const [editForm, setEditForm] = useState({ name: '', slug: '', image: '', isActive: true });
   const [saving, setSaving] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
+  const [errorMsg, setErrorMsg] = useState('');
 
   useEffect(() => {
     setLoading(true);
@@ -28,6 +30,7 @@ export default function AdminCategoriesPage() {
 
   const openEditModal = (cat) => {
     setEditingCategory(cat);
+    setErrorMsg('');
     setEditForm({
       name: cat.name || '',
       slug: cat.slug || '',
@@ -36,14 +39,21 @@ export default function AdminCategoriesPage() {
     });
   };
 
-  const handleImageUpload = (e) => {
+  const handleImageUpload = async (e) => {
     const file = e.target.files[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setEditForm(prev => ({ ...prev, image: reader.result }));
-      };
-      reader.readAsDataURL(file);
+      setUploadingImage(true);
+      setErrorMsg('');
+      try {
+        const url = await uploadImage(file);
+        if (url) {
+          setEditForm(prev => ({ ...prev, image: url }));
+        }
+      } catch (err) {
+        setErrorMsg('Failed to upload category image.');
+      } finally {
+        setUploadingImage(false);
+      }
     }
   };
 
@@ -51,6 +61,7 @@ export default function AdminCategoriesPage() {
     e.preventDefault();
     if (!editingCategory) return;
     setSaving(true);
+    setErrorMsg('');
 
     try {
       const res = await apiFetch(`/api/categories/${editingCategory._id}`, {
@@ -66,9 +77,7 @@ export default function AdminCategoriesPage() {
         setEditingCategory(null);
       }, 1000);
     } catch (err) {
-      const updated = { ...editingCategory, ...editForm };
-      setCategories(prev => prev.map(c => c._id === editingCategory._id ? updated : c));
-      setEditingCategory(null);
+      setErrorMsg(err.message || 'Failed to update category on server');
     } finally {
       setSaving(false);
     }
@@ -122,7 +131,7 @@ export default function AdminCategoriesPage() {
                   <td className="py-4 px-6">
                     <div className="w-10 h-10 rounded-xl bg-slate-50 border border-gray-100 flex items-center justify-center overflow-hidden p-1">
                       {cat.image ? (
-                        <img src={cat.image} alt={cat.name} className="w-full h-full object-contain" />
+                        <img src={getImageUrl(cat.image)} alt={cat.name} className="w-full h-full object-contain" />
                       ) : (
                         getCategoryIcon(cat.slug)
                       )}
@@ -190,6 +199,12 @@ export default function AdminCategoriesPage() {
               </div>
             )}
 
+            {errorMsg && (
+              <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-xl flex items-center gap-2">
+                <span>{errorMsg}</span>
+              </div>
+            )}
+
             <form onSubmit={handleSaveEdit} className="space-y-4 text-xs">
               <div>
                 <label className="block text-slate-700 font-semibold mb-1">Category Name</label>
@@ -225,15 +240,15 @@ export default function AdminCategoriesPage() {
                 <div className="flex items-center gap-4">
                   <div className="w-14 h-14 rounded-2xl bg-slate-50 border border-gray-200 flex items-center justify-center overflow-hidden p-2">
                     {editForm.image ? (
-                      <img src={editForm.image} alt="Preview" className="max-w-full max-h-full object-contain" />
+                      <img src={getImageUrl(editForm.image)} alt="Preview" className="max-w-full max-h-full object-contain" />
                     ) : (
                       getCategoryIcon(editForm.slug)
                     )}
                   </div>
                   <label className="cursor-pointer px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-semibold transition-colors flex items-center gap-2">
                     <UploadCloud className="w-4 h-4" />
-                    <span>Upload New Image</span>
-                    <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
+                    <span>{uploadingImage ? 'Uploading Image...' : 'Upload New Image'}</span>
+                    <input type="file" accept="image/*" disabled={uploadingImage} onChange={handleImageUpload} className="hidden" />
                   </label>
                 </div>
               </div>

@@ -25,6 +25,7 @@ const createBrand = async (req, res) => {
 
     if (getDbStatus()) {
       const brand = await Brand.create({ name, slug: safeSlug, image: image || '' });
+      store.brands.push(brand.toObject ? brand.toObject() : brand);
       return res.status(201).json({ success: true, brand });
     } else {
       const newBrand = {
@@ -42,19 +43,41 @@ const createBrand = async (req, res) => {
   }
 };
 
+const mongoose = require('mongoose');
+
 const updateBrand = async (req, res) => {
   try {
     const { id } = req.params;
+    const isObjectId = mongoose.Types.ObjectId.isValid(id);
+    const query = isObjectId ? { _id: id } : { $or: [{ slug: id }, { name: new RegExp(`^${id}$`, 'i') }] };
+
+    // Update in store cache
+    const idx = store.brands.findIndex(b => b._id === id || b.slug === id || (b.name && b.name.toLowerCase() === id.toLowerCase()));
+    if (idx !== -1) {
+      store.brands[idx] = { ...store.brands[idx], ...req.body };
+    }
+
     if (getDbStatus()) {
-      const brand = await Brand.findByIdAndUpdate(id, req.body, { new: true });
-      return res.json({ success: true, brand });
-    } else {
-      const idx = store.brands.findIndex(b => b._id === id || b.slug === id);
-      if (idx !== -1) {
-        store.brands[idx] = { ...store.brands[idx], ...req.body };
-        return res.json({ success: true, brand: store.brands[idx] });
+      let brand = await Brand.findOneAndUpdate(query, req.body, { new: true });
+      if (!brand && !isObjectId) {
+        brand = await Brand.create({
+          name: req.body.name || id,
+          slug: req.body.slug || id,
+          image: req.body.image || '',
+          isActive: req.body.isActive !== false,
+        });
+      }
+      if (brand) {
+        return res.json({ success: true, brand });
       }
       return res.status(404).json({ success: false, message: 'Brand not found' });
+    } else {
+      if (idx !== -1) {
+        return res.json({ success: true, brand: store.brands[idx] });
+      }
+      const newBrand = { _id: 'brd_' + Date.now(), ...req.body };
+      store.brands.push(newBrand);
+      return res.json({ success: true, brand: newBrand });
     }
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
@@ -64,16 +87,19 @@ const updateBrand = async (req, res) => {
 const deleteBrand = async (req, res) => {
   try {
     const { id } = req.params;
+    const isObjectId = mongoose.Types.ObjectId.isValid(id);
+    const query = isObjectId ? { _id: id } : { $or: [{ slug: id }, { name: new RegExp(`^${id}$`, 'i') }] };
+
+    const idx = store.brands.findIndex(b => b._id === id || b.slug === id);
+    if (idx !== -1) {
+      store.brands.splice(idx, 1);
+    }
+
     if (getDbStatus()) {
-      await Brand.findByIdAndDelete(id);
+      await Brand.findOneAndDelete(query);
       return res.json({ success: true, message: 'Brand deleted' });
     } else {
-      const idx = store.brands.findIndex(b => b._id === id || b.slug === id);
-      if (idx !== -1) {
-        store.brands.splice(idx, 1);
-        return res.json({ success: true, message: 'Brand deleted' });
-      }
-      return res.status(404).json({ success: false, message: 'Brand not found' });
+      return res.json({ success: true, message: 'Brand deleted' });
     }
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });

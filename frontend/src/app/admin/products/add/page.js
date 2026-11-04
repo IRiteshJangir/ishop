@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { initialCategories, initialBrands, initialColors } from '@/lib/mockData';
-import { apiFetch } from '@/lib/api';
+import { apiFetch, uploadImage, getImageUrl } from '@/lib/api';
 import { 
   UploadCloud, Bold, Italic, Underline, Strikethrough, AlignLeft, 
   AlignCenter, AlignRight, List, ListOrdered, Link2, Image as ImageIcon, 
@@ -30,7 +30,9 @@ export default function CreateNewProductPage() {
   const [description, setDescription] = useState('');
   const [thumbnail, setThumbnail] = useState('');
   const [saving, setSaving] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
 
   // Auto calculate final price
   const calculatedFinalPrice = (originalPrice * (1 - discount / 100)).toFixed(2);
@@ -40,20 +42,28 @@ export default function CreateNewProductPage() {
     setSlug(val.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, ''));
   };
 
-  const handleImageUpload = (e) => {
+  const handleImageUpload = async (e) => {
     const file = e.target.files[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setThumbnail(reader.result);
-      };
-      reader.readAsDataURL(file);
+      setUploadingImage(true);
+      setErrorMsg('');
+      try {
+        const url = await uploadImage(file);
+        if (url) {
+          setThumbnail(url);
+        }
+      } catch (err) {
+        setErrorMsg('Failed to upload image. Please try again.');
+      } finally {
+        setUploadingImage(false);
+      }
     }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSaving(true);
+    setErrorMsg('');
 
     const payload = {
       name,
@@ -77,8 +87,7 @@ export default function CreateNewProductPage() {
       setSuccess(true);
       setTimeout(() => router.push('/admin/products'), 1000);
     } catch (e) {
-      setSuccess(true);
-      setTimeout(() => router.push('/admin/products'), 1000);
+      setErrorMsg(e.message || 'Failed to create product');
     } finally {
       setSaving(false);
     }
@@ -107,6 +116,12 @@ export default function CreateNewProductPage() {
         {success && (
           <div className="p-3 bg-emerald-50 text-emerald-700 text-xs rounded-xl flex items-center gap-2">
             <CheckCircle2 className="w-4 h-4" /> Product published to catalog successfully!
+          </div>
+        )}
+
+        {errorMsg && (
+          <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-xl flex items-center gap-2">
+            <span>{errorMsg}</span>
           </div>
         )}
 
@@ -178,9 +193,14 @@ export default function CreateNewProductPage() {
             <div>
               <label className="block text-gray-600 font-semibold mb-1">Product Thumbnail Image</label>
               <label className="border-2 border-dashed border-gray-200 hover:border-admin-primary rounded-2xl p-8 flex flex-col items-center justify-center cursor-pointer transition-colors bg-slate-50/50 min-h-[220px]">
-                <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
-                {thumbnail ? (
-                  <img src={thumbnail} alt="Preview" className="h-40 object-contain rounded-xl" />
+                <input type="file" accept="image/*" disabled={uploadingImage} onChange={handleImageUpload} className="hidden" />
+                {uploadingImage ? (
+                  <div className="flex flex-col items-center justify-center py-6">
+                    <div className="w-8 h-8 border-2 border-admin-primary border-t-transparent rounded-full animate-spin mb-2" />
+                    <p className="text-xs font-semibold text-admin-primary">Uploading image...</p>
+                  </div>
+                ) : thumbnail ? (
+                  <img src={getImageUrl(thumbnail)} alt="Preview" className="h-40 object-contain rounded-xl" />
                 ) : (
                   <>
                     <div className="w-12 h-12 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center mb-3">

@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { initialProducts, initialCategories, initialBrands } from '@/lib/mockData';
-import { apiFetch } from '@/lib/api';
+import { apiFetch, uploadImage, getImageUrl } from '@/lib/api';
 import { Plus, Eye, Trash2, Edit2, Image as ImageIcon, X, Check, UploadCloud } from 'lucide-react';
 
 export default function AdminProductsPage() {
@@ -28,7 +28,9 @@ export default function AdminProductsPage() {
     isTopSelling: false,
   });
   const [saving, setSaving] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
+  const [errorMsg, setErrorMsg] = useState('');
 
   useEffect(() => {
     apiFetch('/api/products')
@@ -52,6 +54,7 @@ export default function AdminProductsPage() {
 
   const openEditModal = (p) => {
     setEditingProduct(p);
+    setErrorMsg('');
     const orig = Number(p.originalPrice) || 0;
     const disc = Number(p.discount) || 0;
     const fin = p.finalPrice !== undefined ? Number(p.finalPrice) : Number((orig * (1 - disc / 100)).toFixed(2));
@@ -84,14 +87,21 @@ export default function AdminProductsPage() {
     }));
   };
 
-  const handleImageUpload = (e) => {
+  const handleImageUpload = async (e) => {
     const file = e.target.files[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setEditForm(prev => ({ ...prev, thumbnail: reader.result }));
-      };
-      reader.readAsDataURL(file);
+      setUploadingImage(true);
+      setErrorMsg('');
+      try {
+        const url = await uploadImage(file);
+        if (url) {
+          setEditForm(prev => ({ ...prev, thumbnail: url }));
+        }
+      } catch (err) {
+        setErrorMsg('Failed to upload image. Please try again.');
+      } finally {
+        setUploadingImage(false);
+      }
     }
   };
 
@@ -99,6 +109,7 @@ export default function AdminProductsPage() {
     e.preventDefault();
     if (!editingProduct) return;
     setSaving(true);
+    setErrorMsg('');
 
     try {
       const res = await apiFetch(`/api/products/${editingProduct._id}`, {
@@ -114,9 +125,7 @@ export default function AdminProductsPage() {
         setEditingProduct(null);
       }, 1000);
     } catch (err) {
-      const updated = { ...editingProduct, ...editForm };
-      setProducts(prev => prev.map(p => p._id === editingProduct._id ? updated : p));
-      setEditingProduct(null);
+      setErrorMsg(err.message || 'Failed to update product on server');
     } finally {
       setSaving(false);
     }
@@ -184,7 +193,7 @@ export default function AdminProductsPage() {
                 <tr key={p._id} className="hover:bg-slate-50/60 transition-colors">
                   <td className="py-4 px-6">
                     <div className="w-12 h-12 rounded-xl bg-slate-50 border border-gray-100 flex items-center justify-center overflow-hidden p-1">
-                      <img src={p.thumbnail} alt={p.name} className="w-full h-full object-contain" />
+                      <img src={getImageUrl(p.thumbnail)} alt={p.name} className="w-full h-full object-contain" />
                     </div>
                   </td>
 
@@ -276,6 +285,12 @@ export default function AdminProductsPage() {
               <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs rounded-xl flex items-center gap-2">
                 <Check className="w-4 h-4 text-emerald-600" />
                 <span>{successMsg}</span>
+              </div>
+            )}
+
+            {errorMsg && (
+              <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-xl flex items-center gap-2">
+                <span>{errorMsg}</span>
               </div>
             )}
 
@@ -395,7 +410,7 @@ export default function AdminProductsPage() {
                 <div className="flex items-center gap-4">
                   <div className="w-16 h-16 rounded-2xl bg-slate-50 border border-gray-200 flex items-center justify-center overflow-hidden p-1.5 flex-shrink-0">
                     {editForm.thumbnail ? (
-                      <img src={editForm.thumbnail} alt="Preview" className="w-full h-full object-contain" />
+                      <img src={getImageUrl(editForm.thumbnail)} alt="Preview" className="w-full h-full object-contain" />
                     ) : (
                       <UploadCloud className="w-6 h-6 text-gray-400" />
                     )}
@@ -403,15 +418,15 @@ export default function AdminProductsPage() {
                   <div className="flex-1 space-y-1.5">
                     <input
                       type="text"
-                      placeholder="Image URL (https://...)"
+                      placeholder="Image URL (https://... or /uploads/...)"
                       value={editForm.thumbnail}
                       onChange={(e) => setEditForm(prev => ({ ...prev, thumbnail: e.target.value }))}
                       className="w-full bg-slate-50 border border-gray-200 rounded-xl px-3 py-2 outline-none focus:border-admin-primary text-slate-800 font-mono text-[11px]"
                     />
                     <label className="inline-flex items-center gap-1.5 text-[11px] text-admin-primary font-bold cursor-pointer hover:underline">
                       <UploadCloud className="w-3.5 h-3.5" />
-                      <span>Or upload image file</span>
-                      <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
+                      <span>{uploadingImage ? 'Uploading image...' : 'Or upload image file'}</span>
+                      <input type="file" accept="image/*" disabled={uploadingImage} onChange={handleImageUpload} className="hidden" />
                     </label>
                   </div>
                 </div>

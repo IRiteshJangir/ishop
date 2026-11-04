@@ -6,7 +6,7 @@ import { useParams } from 'next/navigation';
 import Header from '@/components/header/Header';
 import Footer from '@/components/footer/Footer';
 import { initialProducts } from '@/lib/mockData';
-import { apiFetch } from '@/lib/api';
+import { apiFetch, getImageUrl } from '@/lib/api';
 import { useCart } from '@/context/CartContext';
 import { useWishlist } from '@/context/WishlistContext';
 import { 
@@ -115,7 +115,7 @@ export default function ProductDetailPage() {
                     selectedImage === img ? 'border-primary shadow' : 'border-gray-200 hover:border-gray-400'
                   }`}
                 >
-                  <img src={img} alt="" className="w-full h-full object-contain" />
+                  <img src={getImageUrl(img)} alt="" className="w-full h-full object-contain" />
                 </button>
               ))}
             </div>
@@ -123,7 +123,7 @@ export default function ProductDetailPage() {
             {/* Main Image */}
             <div className="flex-1 bg-slate-50 rounded-2xl p-6 flex items-center justify-center relative min-h-[320px]">
               <img
-                src={selectedImage || product.thumbnail}
+                src={getImageUrl(selectedImage || product.thumbnail)}
                 alt={product.name}
                 className="max-h-80 object-contain hover:scale-105 transition-transform duration-300"
               />

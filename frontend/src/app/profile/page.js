@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import Header from '@/components/header/Header';
 import Footer from '@/components/footer/Footer';
 import { useAuth } from '@/context/AuthContext';
@@ -11,15 +12,24 @@ import {
   ExternalLink, Clock 
 } from 'lucide-react';
 
-export default function ProfilePage() {
+function ProfileContent() {
   const { user, updateProfile, logout } = useAuth();
+  const searchParams = useSearchParams();
+  const initialTab = searchParams?.get('tab') || 'info';
 
-  const [activeTab, setActiveTab] = useState('info');
+  const [activeTab, setActiveTab] = useState(initialTab);
   const [firstName, setFirstName] = useState(user?.name ? user.name.split(' ')[0] : '');
   const [lastName, setLastName] = useState(user?.name ? user.name.split(' ').slice(1).join(' ') : '');
   const [email, setEmail] = useState(user?.email || '');
   const [phone, setPhone] = useState(user?.phone || '');
   const [savedSuccess, setSavedSuccess] = useState(false);
+
+  useEffect(() => {
+    const tabParam = searchParams?.get('tab');
+    if (tabParam) {
+      setActiveTab(tabParam);
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     if (user) {
@@ -251,7 +261,7 @@ export default function ProfilePage() {
                         <div className="flex flex-wrap items-center justify-between text-xs gap-2 border-b border-gray-200 pb-2">
                           <span className="font-bold text-slate-900">Order ID: #{ord._id}</span>
                           <span className="bg-emerald-100 text-emerald-800 font-bold px-2.5 py-0.5 rounded-full text-[10px]">
-                            {ord.status || 'Processing'}
+                            {ord.orderStatus || ord.status || 'Processing'}
                           </span>
                         </div>
                         <div className="space-y-2">
@@ -262,9 +272,18 @@ export default function ProfilePage() {
                             </div>
                           ))}
                         </div>
-                        <div className="border-t border-gray-200 pt-2 flex justify-between text-xs font-black text-slate-900">
-                          <span>Total Paid:</span>
-                          <span className="text-primary">${ord.totalPrice?.toFixed(2)}</span>
+                        <div className="border-t border-gray-200 pt-3 flex flex-wrap items-center justify-between gap-2 text-xs font-black text-slate-900">
+                          <div className="flex items-center gap-1.5">
+                            <span>Total Paid:</span>
+                            <span className="text-primary">${ord.totalPrice?.toFixed(2)}</span>
+                          </div>
+                          <Link
+                            href={`/track-order?orderId=${ord._id}`}
+                            className="text-[11px] font-bold text-primary hover:text-primary-dark hover:underline flex items-center gap-1.5 bg-primary/10 px-3 py-1.5 rounded-xl transition-colors"
+                          >
+                            <span>Live Tracking</span>
+                            <ExternalLink className="w-3.5 h-3.5" />
+                          </Link>
                         </div>
                       </div>
                     ))}
@@ -334,5 +353,17 @@ export default function ProfilePage() {
 
       <Footer />
     </div>
+  );
+}
+
+export default function ProfilePage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+      </div>
+    }>
+      <ProfileContent />
+    </Suspense>
   );
 }

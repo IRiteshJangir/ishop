@@ -5,7 +5,7 @@ import Link from 'next/link';
 import Header from '@/components/header/Header';
 import Footer from '@/components/footer/Footer';
 import { initialProducts } from '@/lib/mockData';
-import { apiFetch } from '@/lib/api';
+import { apiFetch, getImageUrl } from '@/lib/api';
 import { useCart } from '@/context/CartContext';
 import { useWishlist } from '@/context/WishlistContext';
 import { 
@@ -128,7 +128,7 @@ export default function HomePage() {
     badgeType: p.isTopSelling ? 'top' : p.discount > 0 ? 'save' : 'new',
     rating: p.rating || 5.0,
     reviews: p.numReviews || 88,
-    image: p.thumbnail || 'https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?w=400&auto=format&fit=crop&q=80',
+    image: getImageUrl(p.thumbnail),
     shipping: 'FREE SHIPPING',
     stock: (p.countInStock !== undefined ? p.countInStock > 0 : true) ? 'In stock' : 'Out of stock',
     colors: p.colorHexes && p.colorHexes.length ? p.colorHexes : ['#ffffff', '#1f2937'],

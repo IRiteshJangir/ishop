@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { initialBrands } from '@/lib/mockData';
-import { apiFetch } from '@/lib/api';
+import { apiFetch, uploadImage, getImageUrl } from '@/lib/api';
 import { Plus, X, Check, UploadCloud } from 'lucide-react';
 
 export default function AdminBrandsPage() {
@@ -11,7 +11,9 @@ export default function AdminBrandsPage() {
   const [editingBrand, setEditingBrand] = useState(null);
   const [editForm, setEditForm] = useState({ name: '', slug: '', image: '', isActive: true });
   const [saving, setSaving] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
+  const [errorMsg, setErrorMsg] = useState('');
 
   useEffect(() => {
     apiFetch('/api/brands')
@@ -23,6 +25,7 @@ export default function AdminBrandsPage() {
 
   const openEditModal = (brand) => {
     setEditingBrand(brand);
+    setErrorMsg('');
     setEditForm({
       name: brand.name || '',
       slug: brand.slug || '',
@@ -31,14 +34,21 @@ export default function AdminBrandsPage() {
     });
   };
 
-  const handleImageUpload = (e) => {
+  const handleImageUpload = async (e) => {
     const file = e.target.files[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setEditForm(prev => ({ ...prev, image: reader.result }));
-      };
-      reader.readAsDataURL(file);
+      setUploadingImage(true);
+      setErrorMsg('');
+      try {
+        const url = await uploadImage(file);
+        if (url) {
+          setEditForm(prev => ({ ...prev, image: url }));
+        }
+      } catch (err) {
+        setErrorMsg('Failed to upload image. Please try again.');
+      } finally {
+        setUploadingImage(false);
+      }
     }
   };
 
@@ -46,6 +56,7 @@ export default function AdminBrandsPage() {
     e.preventDefault();
     if (!editingBrand) return;
     setSaving(true);
+    setErrorMsg('');
 
     try {
       const res = await apiFetch(`/api/brands/${editingBrand._id}`, {
@@ -61,10 +72,7 @@ export default function AdminBrandsPage() {
         setEditingBrand(null);
       }, 1000);
     } catch (err) {
-      // Optimistic update in UI
-      const updated = { ...editingBrand, ...editForm };
-      setBrands(prev => prev.map(b => b._id === editingBrand._id ? updated : b));
-      setEditingBrand(null);
+      setErrorMsg(err.message || 'Failed to update brand on server');
     } finally {
       setSaving(false);
     }
@@ -111,7 +119,7 @@ export default function AdminBrandsPage() {
                   <td className="py-4 px-6">
                     <div className="w-12 h-10 rounded-xl bg-slate-50 border border-gray-100 flex items-center justify-center overflow-hidden p-2">
                       {b.image ? (
-                        <img src={b.image} alt={b.name} className="max-w-full max-h-full object-contain" />
+                        <img src={getImageUrl(b.image)} alt={b.name} className="max-w-full max-h-full object-contain" />
                       ) : (
                         <span className="font-black text-slate-400 text-xs">{b.name.charAt(0)}</span>
                       )}
@@ -179,6 +187,12 @@ export default function AdminBrandsPage() {
               </div>
             )}
 
+            {errorMsg && (
+              <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-xl flex items-center gap-2">
+                <span>{errorMsg}</span>
+              </div>
+            )}
+
             <form onSubmit={handleSaveEdit} className="space-y-4 text-xs">
               <div>
                 <label className="block text-slate-700 font-semibold mb-1">Brand Name</label>
@@ -214,15 +228,15 @@ export default function AdminBrandsPage() {
                 <div className="flex items-center gap-4">
                   <div className="w-14 h-14 rounded-2xl bg-slate-50 border border-gray-200 flex items-center justify-center overflow-hidden p-2">
                     {editForm.image ? (
-                      <img src={editForm.image} alt="Preview" className="max-w-full max-h-full object-contain" />
+                      <img src={getImageUrl(editForm.image)} alt="Preview" className="max-w-full max-h-full object-contain" />
                     ) : (
                       <UploadCloud className="w-6 h-6 text-gray-400" />
                     )}
                   </div>
                   <label className="cursor-pointer px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-semibold transition-colors flex items-center gap-2">
                     <UploadCloud className="w-4 h-4" />
-                    <span>Upload New Logo</span>
-                    <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
+                    <span>{uploadingImage ? 'Uploading Logo...' : 'Upload New Logo'}</span>
+                    <input type="file" accept="image/*" disabled={uploadingImage} onChange={handleImageUpload} className="hidden" />
                   </label>
                 </div>
               </div>

@@ -7,7 +7,7 @@ import Header from '@/components/header/Header';
 import Footer from '@/components/footer/Footer';
 import { useCart } from '@/context/CartContext';
 import { useAuth } from '@/context/AuthContext';
-import { apiFetch } from '@/lib/api';
+import { apiFetch, getImageUrl } from '@/lib/api';
 import { ShieldCheck, CheckCircle2, ChevronDown, Check } from 'lucide-react';
 
 export default function CheckoutPage() {
@@ -130,12 +130,19 @@ export default function CheckoutPage() {
             <p className="text-xs text-gray-600 max-w-md mx-auto">
               Your order <strong className="text-slate-900">#{orderSuccess._id}</strong> has been received and is being processed. A confirmation email has been sent to <strong>{formData.email}</strong>.
             </p>
-            <div className="pt-4 flex items-center justify-center gap-4">
+            <div className="pt-4 flex flex-wrap items-center justify-center gap-4">
               <Link
-                href="/profile"
-                className="px-6 py-3 bg-primary text-white text-xs font-bold uppercase rounded-xl hover:bg-primary-dark transition-colors"
+                href={`/track-order?orderId=${orderSuccess._id}`}
+                className="px-6 py-3 bg-primary text-white text-xs font-bold uppercase rounded-xl hover:bg-primary-dark transition-colors shadow-sm flex items-center gap-2"
               >
-                Track in My Orders
+                <span>Track This Order Live</span>
+                <CheckCircle2 className="w-4 h-4" />
+              </Link>
+              <Link
+                href="/profile?tab=orders"
+                className="px-6 py-3 border border-gray-200 text-slate-700 text-xs font-bold uppercase rounded-xl hover:bg-slate-50 transition-colors"
+              >
+                View in My Orders
               </Link>
               <Link
                 href="/shop"
@@ -386,7 +393,7 @@ export default function CheckoutPage() {
                     {cartItems.map((item, idx) => (
                       <div key={idx} className="py-3 flex items-center justify-between gap-4">
                         <div className="flex items-center gap-3">
-                          <img src={item.image} alt={item.name} className="w-10 h-10 object-contain rounded-lg bg-slate-50 p-1" />
+                          <img src={getImageUrl(item.image)} alt={item.name} className="w-10 h-10 object-contain rounded-lg bg-slate-50 p-1" />
                           <div>
                             <p className="font-bold text-slate-800 line-clamp-1">{item.name}</p>
                             <span className="text-gray-400 font-semibold">x {item.quantity}</span>

@@ -32,8 +32,8 @@ app.use(cors({
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
 }));
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 if (process.env.NODE_ENV !== 'production') {
   app.use(morgan('dev'));
@@ -76,10 +76,17 @@ app.use('/api/products', productRoutes);
 app.use('/product', productRoutes); // Alias for /product and /product/create
 app.use('/products', productRoutes); // Alias for /products
 app.use('/api/categories', categoryRoutes);
+app.use('/category', categoryRoutes);
+app.use('/categories', categoryRoutes);
 app.use('/api/brands', brandRoutes);
+app.use('/brand', brandRoutes);
+app.use('/brands', brandRoutes);
 app.use('/api/colors', colorRoutes);
+app.use('/color', colorRoutes);
+app.use('/colors', colorRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/upload', uploadRoutes);
+app.use('/upload', uploadRoutes);
 
 // Error Middlewares
 app.use(notFound);

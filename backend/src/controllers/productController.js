@@ -235,6 +235,7 @@ const createProduct = async (req, res) => {
         countInStock: 25,
       });
 
+      store.products.unshift(product.toObject ? product.toObject() : product);
       return res.status(201).json({ success: true, product });
     } else {
       const newProduct = {
@@ -280,23 +281,53 @@ const updateProduct = async (req, res) => {
     const id = req.params.slugOrId || req.params.id;
     const mongoose = require('mongoose');
 
+    const updatePayload = { ...req.body };
+    delete updatePayload._id;
+    delete updatePayload.__v;
+    delete updatePayload.createdAt;
+    delete updatePayload.updatedAt;
+
+    if (updatePayload.category === '' || (updatePayload.category && !mongoose.Types.ObjectId.isValid(updatePayload.category))) {
+      delete updatePayload.category;
+    }
+    if (updatePayload.brand === '' || (updatePayload.brand && !mongoose.Types.ObjectId.isValid(updatePayload.brand))) {
+      delete updatePayload.brand;
+    }
+
+    if (updatePayload.thumbnail) {
+      if (!updatePayload.images || !updatePayload.images.length) {
+        updatePayload.images = [updatePayload.thumbnail];
+      } else if (!updatePayload.images.includes(updatePayload.thumbnail)) {
+        updatePayload.images = [updatePayload.thumbnail, ...updatePayload.images];
+      }
+    }
+
+    if (updatePayload.originalPrice !== undefined && updatePayload.discount !== undefined && !updatePayload.finalPrice) {
+      updatePayload.finalPrice = Number((Number(updatePayload.originalPrice) * (1 - Number(updatePayload.discount) / 100)).toFixed(2));
+    }
+
+    // Keep memory store in sync
+    const storeIdx = store.products.findIndex(p => p._id === id || p.slug === id || (p.name && p.name.toLowerCase() === id.toLowerCase()));
+    if (storeIdx !== -1) {
+      store.products[storeIdx] = { ...store.products[storeIdx], ...updatePayload };
+    }
+
     if (getDbStatus()) {
       const isObjectId = mongoose.Types.ObjectId.isValid(id);
-      const product = isObjectId ? await Product.findById(id) : await Product.findOne({ slug: id });
+      let product = isObjectId ? await Product.findById(id) : await Product.findOne({ slug: id });
+      if (!product && !isObjectId) {
+        product = await Product.findOne({ name: new RegExp(`^${id}$`, 'i') });
+      }
+
       if (product) {
-        Object.assign(product, req.body);
-        if (req.body.originalPrice && req.body.discount !== undefined && !req.body.finalPrice) {
-          product.finalPrice = Number(req.body.originalPrice) * (1 - Number(req.body.discount) / 100);
-        }
+        Object.assign(product, updatePayload);
         const updated = await product.save();
         return res.json({ success: true, product: updated });
       }
       return res.status(404).json({ success: false, message: 'Product not found' });
     } else {
-      const index = store.products.findIndex(p => p._id === id || p.slug === id);
-      if (index !== -1) {
-        store.products[index] = { ...store.products[index], ...req.body };
-        return res.json({ success: true, product: store.products[index] });
+      if (storeIdx !== -1) {
+        return res.json({ success: true, product: store.products[storeIdx] });
       }
       return res.status(404).json({ success: false, message: 'Product not found' });
     }
@@ -313,6 +344,11 @@ const deleteProduct = async (req, res) => {
     const id = req.params.slugOrId || req.params.id;
     const mongoose = require('mongoose');
 
+    const storeIdx = store.products.findIndex(p => p._id === id || p.slug === id);
+    if (storeIdx !== -1) {
+      store.products.splice(storeIdx, 1);
+    }
+
     if (getDbStatus()) {
       const isObjectId = mongoose.Types.ObjectId.isValid(id);
       const product = isObjectId ? await Product.findById(id) : await Product.findOne({ slug: id });
@@ -322,12 +358,7 @@ const deleteProduct = async (req, res) => {
       }
       return res.status(404).json({ success: false, message: 'Product not found' });
     } else {
-      const index = store.products.findIndex(p => p._id === id || p.slug === id);
-      if (index !== -1) {
-        store.products.splice(index, 1);
-        return res.json({ success: true, message: 'Product removed' });
-      }
-      return res.status(404).json({ success: false, message: 'Product not found' });
+      return res.json({ success: true, message: 'Product removed' });
     }
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });

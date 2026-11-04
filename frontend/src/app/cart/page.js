@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import Header from '@/components/header/Header';
 import Footer from '@/components/footer/Footer';
 import { useCart } from '@/context/CartContext';
+import { getImageUrl } from '@/lib/api';
 import { Trash2, Plus, Minus, ArrowRight, ShieldCheck, CheckCircle2 } from 'lucide-react';
 
 export default function CartPage() {
@@ -62,7 +63,7 @@ export default function CartPage() {
                         </span>
                       )}
                       <img
-                        src={item.image}
+                        src={getImageUrl(item.image)}
                         alt={item.name}
                         className="w-full h-full object-contain"
                       />

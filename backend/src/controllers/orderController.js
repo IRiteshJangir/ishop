@@ -41,6 +41,7 @@ const createOrder = async (req, res) => {
       });
 
       const createdOrder = await order.save();
+      store.orders.unshift(createdOrder);
       return res.status(201).json({ success: true, order: createdOrder });
     } else {
       const newOrder = {
@@ -73,20 +74,27 @@ const createOrder = async (req, res) => {
 // @access  Public / Private
 const getOrderById = async (req, res) => {
   try {
-    const { id } = req.params;
+    const rawId = req.params.id;
+    const id = rawId.replace('#', '').trim();
+    const mongoose = require('mongoose');
+
+    const storeOrder = store.orders.find(o => o._id === id || o._id === rawId);
 
     if (getDbStatus()) {
-      const order = await Order.findById(id).populate('user', 'name email');
+      const isObjectId = mongoose.Types.ObjectId.isValid(id);
+      let order = isObjectId ? await Order.findById(id).populate('user', 'name email') : null;
+      if (!order && storeOrder) {
+        order = storeOrder;
+      }
       if (order) {
         return res.json({ success: true, order });
       }
-      return res.status(404).json({ success: false, message: 'Order not found' });
+      return res.status(404).json({ success: false, message: `Order #${rawId} not found` });
     } else {
-      const order = store.orders.find(o => o._id === id);
-      if (order) {
-        return res.json({ success: true, order });
+      if (storeOrder) {
+        return res.json({ success: true, order: storeOrder });
       }
-      return res.status(404).json({ success: false, message: 'Order not found' });
+      return res.status(404).json({ success: false, message: `Order #${rawId} not found` });
     }
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
@@ -133,11 +141,28 @@ const getAllOrders = async (req, res) => {
 // @access  Private/Admin
 const updateOrderStatus = async (req, res) => {
   try {
-    const { id } = req.params;
+    const rawId = req.params.id;
+    const id = rawId.replace('#', '').trim();
     const { status, isPaid, isDelivered } = req.body;
+    const mongoose = require('mongoose');
+
+    // Update in memory store
+    const idx = store.orders.findIndex(o => o._id === id || o._id === rawId);
+    if (idx !== -1) {
+      if (status) store.orders[idx].status = status;
+      if (isPaid !== undefined) {
+        store.orders[idx].isPaid = isPaid;
+        if (isPaid) store.orders[idx].paidAt = new Date();
+      }
+      if (isDelivered !== undefined) {
+        store.orders[idx].isDelivered = isDelivered;
+        if (isDelivered) store.orders[idx].deliveredAt = new Date();
+      }
+    }
 
     if (getDbStatus()) {
-      const order = await Order.findById(id);
+      const isObjectId = mongoose.Types.ObjectId.isValid(id);
+      let order = isObjectId ? await Order.findById(id) : null;
       if (order) {
         if (status) order.status = status;
         if (isPaid !== undefined) {
@@ -150,23 +175,45 @@ const updateOrderStatus = async (req, res) => {
         }
         const updated = await order.save();
         return res.json({ success: true, order: updated });
-      }
-      return res.status(404).json({ success: false, message: 'Order not found' });
-    } else {
-      const idx = store.orders.findIndex(o => o._id === id);
-      if (idx !== -1) {
-        if (status) store.orders[idx].status = status;
-        if (isPaid !== undefined) {
-          store.orders[idx].isPaid = isPaid;
-          if (isPaid) store.orders[idx].paidAt = new Date();
-        }
-        if (isDelivered !== undefined) {
-          store.orders[idx].isDelivered = isDelivered;
-          if (isDelivered) store.orders[idx].deliveredAt = new Date();
-        }
+      } else if (idx !== -1) {
         return res.json({ success: true, order: store.orders[idx] });
       }
       return res.status(404).json({ success: false, message: 'Order not found' });
+    } else {
+      if (idx !== -1) {
+        return res.json({ success: true, order: store.orders[idx] });
+      }
+      return res.status(404).json({ success: false, message: 'Order not found' });
+    }
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Delete order
+// @route   DELETE /api/orders/:id
+// @access  Private/Admin
+const deleteOrder = async (req, res) => {
+  try {
+    const rawId = req.params.id;
+    const id = rawId.replace('#', '').trim();
+    const mongoose = require('mongoose');
+
+    const idx = store.orders.findIndex(o => o._id === id || o._id === rawId);
+    if (idx !== -1) {
+      store.orders.splice(idx, 1);
+    }
+
+    if (getDbStatus()) {
+      const isObjectId = mongoose.Types.ObjectId.isValid(id);
+      if (isObjectId) {
+        await Order.findByIdAndDelete(id);
+      } else {
+        await Order.findOneAndDelete({ _id: id });
+      }
+      return res.json({ success: true, message: 'Order deleted successfully' });
+    } else {
+      return res.json({ success: true, message: 'Order deleted successfully' });
     }
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
@@ -179,4 +226,5 @@ module.exports = {
   getMyOrders,
   getAllOrders,
   updateOrderStatus,
+  deleteOrder,
 };

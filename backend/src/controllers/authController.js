@@ -28,6 +28,19 @@ const registerUser = async (req, res) => {
         role: 'user',
       });
 
+      // Synchronize in-memory store
+      store.users.push({
+        _id: user._id.toString(),
+        name: user.name,
+        email: user.email,
+        password: user.password,
+        role: user.role,
+        phone: user.phone || '',
+        avatar: user.avatar || '/images/default-avatar.png',
+        addresses: user.addresses || [],
+        createdAt: user.createdAt,
+      });
+
       return res.status(201).json({
         success: true,
         user: {
@@ -275,8 +288,99 @@ const getAllUsers = async (req, res) => {
       return res.json({ success: true, count: safe.length, users: safe });
     }
   } catch (error) {
-    console.error('Registration Error:', error.message);
-    return res.status(500).json({ success: false, message: error.message || 'Server error during registration' });
+    console.error('Get Users Error:', error.message);
+    return res.status(500).json({ success: false, message: error.message || 'Server error retrieving users' });
+  }
+};
+
+// @desc    Delete user (admin)
+// @route   DELETE /api/auth/users/:id
+// @access  Private/Admin
+const deleteUser = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const mongoose = require('mongoose');
+
+    // Remove from in-memory store
+    const storeIdx = store.users.findIndex(u => u._id === id || u.email === id);
+    if (storeIdx !== -1) {
+      store.users.splice(storeIdx, 1);
+    }
+
+    if (getDbStatus()) {
+      const isObjectId = mongoose.Types.ObjectId.isValid(id);
+      const user = isObjectId ? await User.findById(id) : await User.findOne({ email: id });
+      if (user) {
+        await user.deleteOne();
+        return res.json({ success: true, message: 'User deleted successfully' });
+      }
+      return res.status(404).json({ success: false, message: 'User not found' });
+    } else {
+      return res.json({ success: true, message: 'User deleted successfully' });
+    }
+  } catch (error) {
+    console.error('Delete User Error:', error.message);
+    return res.status(500).json({ success: false, message: error.message || 'Server error deleting user' });
+  }
+};
+
+// @desc    Update user role (admin)
+// @route   PUT /api/auth/users/:id/role
+// @access  Private/Admin
+const updateUserRole = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { role } = req.body;
+    const mongoose = require('mongoose');
+
+    if (!role || !['user', 'admin'].includes(role)) {
+      return res.status(400).json({ success: false, message: 'Invalid role. Must be "user" or "admin"' });
+    }
+
+    // Update in store
+    const storeUser = store.users.find(u => u._id === id || u.email === id);
+    if (storeUser) {
+      storeUser.role = role;
+    }
+
+    if (getDbStatus()) {
+      const isObjectId = mongoose.Types.ObjectId.isValid(id);
+      let user = isObjectId ? await User.findById(id) : await User.findOne({ email: id });
+      if (user) {
+        user.role = role;
+        await user.save();
+        return res.json({
+          success: true,
+          message: `User role updated to ${role}`,
+          user: {
+            _id: user._id,
+            name: user.name,
+            email: user.email,
+            role: user.role,
+            phone: user.phone,
+          },
+        });
+      }
+      return res.status(404).json({ success: false, message: 'User not found' });
+    } else {
+      if (storeUser) {
+        return res.json({
+          success: true,
+          message: `User role updated to ${role}`,
+          user: {
+            _id: storeUser._id,
+            name: storeUser.name,
+            email: storeUser.email,
+            role: storeUser.role,
+            phone: storeUser.phone,
+          },
+        });
+      }
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+  } catch (error) {
+    console.error('Update Role Error:', error.message);
+    return res.status(500).json({ success: false, message: error.message || 'Server error updating user role' });
   }
 };
 
@@ -286,4 +390,6 @@ module.exports = {
   getUserProfile,
   updateUserProfile,
   getAllUsers,
+  deleteUser,
+  updateUserRole,
 };

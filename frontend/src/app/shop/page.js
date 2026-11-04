@@ -5,7 +5,7 @@ import Link from 'next/link';
 import Header from '@/components/header/Header';
 import Footer from '@/components/footer/Footer';
 import { initialProducts, initialCategories, initialBrands, initialColors } from '@/lib/mockData';
-import { apiFetch } from '@/lib/api';
+import { apiFetch, getImageUrl } from '@/lib/api';
 import { useCart } from '@/context/CartContext';
 import { useWishlist } from '@/context/WishlistContext';
 import { 
@@ -412,7 +412,7 @@ export default function ShopPage() {
                       {/* Image */}
                       <Link href={`/product/${p.slug}`} className="block h-48 w-full p-2 overflow-hidden flex items-center justify-center">
                         <img 
-                          src={p.thumbnail} 
+                          src={getImageUrl(p.thumbnail)} 
                           alt={p.name} 
                           className="max-h-full max-w-full object-contain group-hover:scale-105 transition-transform duration-300" 
                         />
@@ -459,7 +459,7 @@ export default function ShopPage() {
                 {filteredProducts.map((p) => (
                   <div key={p._id} className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm flex flex-col sm:flex-row items-center gap-6">
                     <div className="w-40 h-40 flex-shrink-0 flex items-center justify-center p-2 bg-slate-50 rounded-xl">
-                      <img src={p.thumbnail} alt={p.name} className="max-h-full max-w-full object-contain" />
+                      <img src={getImageUrl(p.thumbnail)} alt={p.name} className="max-h-full max-w-full object-contain" />
                     </div>
 
                     <div className="flex-1 space-y-2">

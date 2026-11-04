@@ -2,8 +2,7 @@ const mongoose = require('mongoose');
 
 const orderItemSchema = new mongoose.Schema({
   product: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Product',
+    type: mongoose.Schema.Types.Mixed,
     required: false,
   },
   name: { type: String, required: true },
@@ -15,24 +14,23 @@ const orderItemSchema = new mongoose.Schema({
 });
 
 const shippingAddressSchema = new mongoose.Schema({
-  firstName: { type: String, required: true },
-  lastName: { type: String, required: true },
+  firstName: { type: String, default: '' },
+  lastName: { type: String, default: '' },
   company: { type: String, default: '' },
-  country: { type: String, required: true, default: 'United States (US)' },
-  street: { type: String, required: true },
+  country: { type: String, default: 'United States (US)' },
+  street: { type: String, default: '' },
   apartment: { type: String, default: '' },
-  city: { type: String, required: true },
-  state: { type: String, required: true, default: 'Washington' },
-  zipCode: { type: String, required: true },
-  phone: { type: String, required: true },
-  email: { type: String, required: true },
+  city: { type: String, default: '' },
+  state: { type: String, default: 'Washington' },
+  zipCode: { type: String, default: '' },
+  phone: { type: String, default: '' },
+  email: { type: String, default: '' },
 });
 
 const orderSchema = new mongoose.Schema(
   {
     user: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'User',
+      type: mongoose.Schema.Types.Mixed,
       required: false,
     },
     orderItems: [orderItemSchema],

@@ -12,6 +12,7 @@ export default function AdminColorsPage() {
   const [editForm, setEditForm] = useState({ name: '', slug: '', hex: '#000000', isActive: true });
   const [saving, setSaving] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
+  const [errorMsg, setErrorMsg] = useState('');
 
   useEffect(() => {
     apiFetch('/api/colors')
@@ -23,10 +24,11 @@ export default function AdminColorsPage() {
 
   const openEditModal = (col) => {
     setEditingColor(col);
+    setErrorMsg('');
     setEditForm({
       name: col.name || '',
       slug: col.slug || '',
-      hex: col.hex || '#000000',
+      hex: col.hexColor || col.hex || '#000000',
       isActive: col.isActive !== false,
     });
   };
@@ -35,14 +37,23 @@ export default function AdminColorsPage() {
     e.preventDefault();
     if (!editingColor) return;
     setSaving(true);
+    setErrorMsg('');
 
     try {
+      const payload = {
+        name: editForm.name,
+        slug: editForm.slug,
+        hexColor: editForm.hex,
+        hex: editForm.hex,
+        isActive: editForm.isActive,
+      };
+
       const res = await apiFetch(`/api/colors/${editingColor._id}`, {
         method: 'PUT',
-        body: JSON.stringify(editForm),
+        body: JSON.stringify(payload),
       });
 
-      const updated = res.color || { ...editingColor, ...editForm };
+      const updated = res.color || { ...editingColor, ...payload };
       setColors(prev => prev.map(c => c._id === editingColor._id ? updated : c));
       setSuccessMsg('Color updated successfully!');
       setTimeout(() => {
@@ -50,9 +61,7 @@ export default function AdminColorsPage() {
         setEditingColor(null);
       }, 1000);
     } catch (err) {
-      const updated = { ...editingColor, ...editForm };
-      setColors(prev => prev.map(c => c._id === editingColor._id ? updated : c));
-      setEditingColor(null);
+      setErrorMsg(err.message || 'Failed to update color on server');
     } finally {
       setSaving(false);
     }
@@ -100,9 +109,9 @@ export default function AdminColorsPage() {
                     <div className="flex items-center gap-3">
                       <div
                         className="w-7 h-7 rounded-full border border-gray-200 shadow-inner"
-                        style={{ backgroundColor: col.hex }}
+                        style={{ backgroundColor: col.hexColor || col.hex }}
                       />
-                      <span className="font-mono text-xs font-bold text-slate-700">{col.hex}</span>
+                      <span className="font-mono text-xs font-bold text-slate-700">{col.hexColor || col.hex}</span>
                     </div>
                   </td>
 
@@ -164,6 +173,12 @@ export default function AdminColorsPage() {
               <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs rounded-xl flex items-center gap-2">
                 <Check className="w-4 h-4 text-emerald-600" />
                 <span>{successMsg}</span>
+              </div>
+            )}
+
+            {errorMsg && (
+              <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-xl flex items-center gap-2">
+                <span>{errorMsg}</span>
               </div>
             )}
 

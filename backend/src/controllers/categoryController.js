@@ -25,6 +25,7 @@ const createCategory = async (req, res) => {
 
     if (getDbStatus()) {
       const category = await Category.create({ name, slug: safeSlug, image: image || '' });
+      store.categories.push(category.toObject ? category.toObject() : category);
       return res.status(201).json({ success: true, category });
     } else {
       const newCat = {
@@ -42,19 +43,41 @@ const createCategory = async (req, res) => {
   }
 };
 
+const mongoose = require('mongoose');
+
 const updateCategory = async (req, res) => {
   try {
     const { id } = req.params;
+    const isObjectId = mongoose.Types.ObjectId.isValid(id);
+    const query = isObjectId ? { _id: id } : { $or: [{ slug: id }, { name: new RegExp(`^${id}$`, 'i') }] };
+
+    // Update in store cache
+    const idx = store.categories.findIndex(c => c._id === id || c.slug === id || (c.name && c.name.toLowerCase() === id.toLowerCase()));
+    if (idx !== -1) {
+      store.categories[idx] = { ...store.categories[idx], ...req.body };
+    }
+
     if (getDbStatus()) {
-      const cat = await Category.findByIdAndUpdate(id, req.body, { new: true });
-      return res.json({ success: true, category: cat });
-    } else {
-      const idx = store.categories.findIndex(c => c._id === id || c.slug === id);
-      if (idx !== -1) {
-        store.categories[idx] = { ...store.categories[idx], ...req.body };
-        return res.json({ success: true, category: store.categories[idx] });
+      let cat = await Category.findOneAndUpdate(query, req.body, { new: true });
+      if (!cat && !isObjectId) {
+        cat = await Category.create({
+          name: req.body.name || id,
+          slug: req.body.slug || id,
+          image: req.body.image || '',
+          isActive: req.body.isActive !== false,
+        });
+      }
+      if (cat) {
+        return res.json({ success: true, category: cat });
       }
       return res.status(404).json({ success: false, message: 'Category not found' });
+    } else {
+      if (idx !== -1) {
+        return res.json({ success: true, category: store.categories[idx] });
+      }
+      const newCat = { _id: 'cat_' + Date.now(), ...req.body };
+      store.categories.push(newCat);
+      return res.json({ success: true, category: newCat });
     }
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
@@ -64,16 +87,19 @@ const updateCategory = async (req, res) => {
 const deleteCategory = async (req, res) => {
   try {
     const { id } = req.params;
+    const isObjectId = mongoose.Types.ObjectId.isValid(id);
+    const query = isObjectId ? { _id: id } : { $or: [{ slug: id }, { name: new RegExp(`^${id}$`, 'i') }] };
+
+    const idx = store.categories.findIndex(c => c._id === id || c.slug === id);
+    if (idx !== -1) {
+      store.categories.splice(idx, 1);
+    }
+
     if (getDbStatus()) {
-      await Category.findByIdAndDelete(id);
+      await Category.findOneAndDelete(query);
       return res.json({ success: true, message: 'Category deleted' });
     } else {
-      const idx = store.categories.findIndex(c => c._id === id || c.slug === id);
-      if (idx !== -1) {
-        store.categories.splice(idx, 1);
-        return res.json({ success: true, message: 'Category deleted' });
-      }
-      return res.status(404).json({ success: false, message: 'Category not found' });
+      return res.json({ success: true, message: 'Category deleted' });
     }
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
